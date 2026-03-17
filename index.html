@@ -1,0 +1,1844 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Klagenfurt TV – Mediathek</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://assets.streamdiver.com/playerwidget/2.16.0/sdwebwidgets.css" />
+  <script type="module" crossorigin src="https://assets.streamdiver.com/playerwidget/2.16.0/sdwebwidgets.js"></script>
+  <!-- HLS.js for Klagenfurt v1 stream playback -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js"></script>
+  <style>
+    /* ══════════════════════════════════════════
+       DESIGN TOKENS
+    ══════════════════════════════════════════ */
+    :root {
+      --bg:             #0d0f14;
+      --surf-1:         #13161e;
+      --surf-2:         #1a1e2a;
+      --surf-3:         #222738;
+      --border:         rgba(255,255,255,0.07);
+      --border-hover:   rgba(255,255,255,0.16);
+      --text-1:         #edf1f8;
+      --text-2:         #8895aa;
+      --text-3:         #515e72;
+      --accent:         #77D2C8;
+      --accent-light:   #9ee3da;
+      --accent-bg:      rgba(119,210,200,0.12);
+      --accent-bg2:     rgba(119,210,200,0.22);
+      --radius-s:       6px;
+      --radius-m:       10px;
+      --radius-l:       16px;
+      --radius-xl:      20px;
+      --shadow-card:    0 4px 20px rgba(0,0,0,0.4);
+      --shadow-modal:   0 20px 80px rgba(0,0,0,0.7);
+      --transition:     0.2s ease;
+    }
+
+    /* ══════════════════════════════════════════
+       RESET & BASE
+    ══════════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Source Sans 3', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text-1);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    img { display: block; max-width: 100%; }
+    button { cursor: pointer; border: none; background: none; color: inherit; font: inherit; }
+    a { color: inherit; text-decoration: none; }
+
+    /* ══════════════════════════════════════════
+       HEADER
+    ══════════════════════════════════════════ */
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      padding: 0 28px;
+      background: rgba(13,15,20,0.92);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+    .site-header-logo a { display: inline-flex; align-items: center; gap: 10px; }
+    .site-header-logo img {
+      height: 32px;
+      width: auto;
+      filter: brightness(0) saturate(100%) invert(78%) sepia(25%) saturate(741%) hue-rotate(137deg) brightness(103%) contrast(92%);
+      opacity: 0.9;
+      transition: opacity var(--transition);
+    }
+    .site-header-logo a:hover img { opacity: 1; }
+    .site-header-title {
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      color: var(--text-1);
+      white-space: nowrap;
+    }
+
+    /* ══════════════════════════════════════════
+       LAYOUT
+    ══════════════════════════════════════════ */
+    .container {
+      max-width: 1560px;
+      margin: 0 auto;
+      padding: 0 40px;
+    }
+
+    /* ══════════════════════════════════════════
+       HERO SECTION  (full-width ORF ON style)
+    ══════════════════════════════════════════ */
+    .hero { padding: 0; }
+
+    /* Full-viewport-width featured image */
+    .hero-featured {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 21/9;
+      background: var(--surf-2);
+      cursor: pointer;
+      overflow: hidden;
+    }
+    @media (max-width: 900px) { .hero-featured { aspect-ratio: 16/9; } }
+    .hero-featured > img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      /* Perceived sharpness boost for upscaled thumbnails */
+      filter: contrast(1.06) saturate(1.12);
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: crisp-edges;
+      transition: transform 0.6s ease, opacity 0.25s ease, filter 0.25s ease;
+    }
+    .hero-featured:hover > img { transform: scale(1.02); }
+    .hero-gradient {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        to top,
+        rgba(5,7,12,0.95) 0%,
+        rgba(5,7,12,0.5)  35%,
+        transparent       65%
+      );
+    }
+    .hero-overlay {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      padding: 0 0 36px;
+    }
+    .hero-overlay .container { /* re-use container for left-aligned text */ }
+    .hero-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--accent);
+      color: #0d0f14;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: var(--radius-s);
+      margin-bottom: 12px;
+    }
+    .hero-main-title {
+      font-size: clamp(22px, 3vw, 42px);
+      font-weight: 900;
+      line-height: 1.2;
+      text-shadow: 0 2px 16px rgba(0,0,0,0.7);
+      margin-bottom: 10px;
+      max-width: 700px;
+    }
+    .hero-main-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: rgba(255,255,255,0.7);
+      margin-bottom: 18px;
+    }
+    .hero-play-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      background: rgba(255,255,255,0.95);
+      color: #0d0f14;
+      font-size: 15px;
+      font-weight: 800;
+      padding: 12px 28px;
+      border-radius: 50px;
+      transition: background var(--transition), transform var(--transition);
+    }
+    .hero-play-btn:hover { background: #fff; transform: scale(1.04); }
+
+    /* Below-hero thumb bar: overlaps the bottom of the hero image */
+    .hero-thumbs-bar {
+      position: relative;
+      z-index: 2;
+      margin-top: -90px;
+      background: rgba(10, 12, 18, 0.88);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-top: 1px solid rgba(255,255,255,0.08);
+      border-bottom: 1px solid var(--border);
+    }
+    .hero-list {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+    }
+    @media (max-width: 700px) { .hero-list { grid-template-columns: repeat(2, 1fr); } }
+    .hero-item {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      padding: 14px 16px;
+      cursor: pointer;
+      border-right: 1px solid var(--border);
+      border-top: 3px solid transparent;
+      transition: background var(--transition), border-color var(--transition);
+    }
+    .hero-item:last-child { border-right: none; }
+    .hero-item:hover { background: var(--surf-2); }
+    .hero-item.active {
+      background: var(--surf-2);
+      border-top-color: var(--accent);
+    }
+    .hero-item-thumb {
+      width: 90px;
+      height: 51px;
+      border-radius: var(--radius-s);
+      overflow: hidden;
+      flex-shrink: 0;
+      background: var(--surf-3);
+    }
+    .hero-item-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .hero-item-title {
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.4;
+      color: var(--text-1);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .hero-item.active .hero-item-title { color: var(--accent); }
+    .hero-item-dur {
+      font-size: 11px;
+      color: var(--text-2);
+      margin-top: 3px;
+    }
+
+    /* ══════════════════════════════════════════
+       DIVIDER
+    ══════════════════════════════════════════ */
+    .section-divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 0;
+    }
+
+    /* ══════════════════════════════════════════
+       CATEGORY TILES  (ORF ON style)
+    ══════════════════════════════════════════ */
+    .categories-section {
+      padding: 0;
+      background: var(--surf-1);
+      border-top: 1px solid var(--border);
+      margin: 44px 0;
+      transition: background var(--transition);
+    }
+    .categories-section:hover { background: var(--surf-2); }
+    .cat-nav-wrap {
+      display: flex;
+      align-items: stretch;
+      position: relative;
+    }
+    /* Arrow nav buttons */
+    .cat-nav-btn {
+      flex-shrink: 0;
+      width: 52px;
+      min-height: 128px;
+      background: var(--surf-2);
+      color: var(--text-1);
+      font-size: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      border-right: 1px solid var(--border);
+      transition: background var(--transition), color var(--transition);
+      cursor: pointer;
+    }
+    .cat-nav-btn.next {
+      border-right: none;
+      border-left: 1px solid var(--border);
+    }
+    .cat-nav-btn:hover:not(:disabled) { background: var(--surf-3); color: var(--accent); }
+    .cat-nav-btn:disabled { opacity: 0.25; cursor: default; }
+    /* Scrollable tile track */
+    .cat-scroll-outer {
+      flex: 1;
+      overflow: hidden;
+    }
+    .cat-scroll-inner {
+      display: flex;
+      align-items: stretch;
+      gap: 8px;
+      padding: 0 8px;
+      transition: transform 0.38s cubic-bezier(0.4,0,0.2,1);
+      will-change: transform;
+    }
+    /* Individual tile */
+    .cat-tile {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      padding: 64px 56px 20px;
+      font-size: 15px;
+      font-weight: 600;
+      white-space: nowrap;
+      text-align: center;
+      color: var(--accent);
+      background: transparent;
+      box-shadow: inset 0 -3px 0 0 transparent;
+      cursor: pointer;
+      transition: background var(--transition), color var(--transition), box-shadow var(--transition);
+      letter-spacing: 0.01em;
+    }
+    .cat-tile:hover:not(.active) {
+      background: var(--surf-3);
+      box-shadow: inset 0 -3px 0 0 rgba(119,210,200,0.6);
+    }
+    .cat-tile.active {
+      background: var(--accent);
+      color: #0d0f14;
+      font-weight: 700;
+      box-shadow: inset 0 -3px 0 0 var(--accent);
+    }
+
+    /* Expanded panel */
+    .cat-expanded {
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height 0.4s cubic-bezier(0.4,0,0.2,1);
+      background: var(--surf-1);
+    }
+    .cat-expanded.open { max-height: 700px; }
+    .cat-expanded-inner {
+      padding: 24px 40px 28px;
+      border-top: 1px solid var(--border);
+    }
+    .cat-expanded-label {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-3);
+      margin-bottom: 18px;
+    }
+    .channels-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 14px;
+    }
+    .ch-card {
+      background: var(--surf-1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-m);
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform var(--transition), border-color var(--transition), box-shadow var(--transition);
+    }
+    .ch-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--accent);
+      box-shadow: var(--shadow-card);
+    }
+    .ch-card-thumb {
+      aspect-ratio: 16/9;
+      background: var(--surf-3);
+      overflow: hidden;
+    }
+    .ch-card-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.3s ease;
+    }
+    .ch-card:hover .ch-card-thumb img { transform: scale(1.06); }
+    .ch-card-body { padding: 11px 13px; }
+    .ch-card-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-1);
+      margin-bottom: 3px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .ch-card-count { font-size: 12px; color: var(--text-2); }
+
+    /* ══════════════════════════════════════════
+       SECTION HEADING
+    ══════════════════════════════════════════ */
+    .section-heading {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-3);
+      margin: 36px 0 4px;
+    }
+
+    /* ══════════════════════════════════════════
+       CHANNEL SLIDERS
+    ══════════════════════════════════════════ */
+    .sliders-wrap { padding-bottom: 56px; }
+    .ch-row {
+      margin-bottom: 44px;
+      padding: 20px 24px;
+      margin-left: -24px;
+      margin-right: -24px;
+      border-radius: var(--radius-l);
+      transition: background var(--transition);
+    }
+    .ch-row:hover { background: var(--surf-1); }
+    .ch-row-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      gap: 12px;
+    }
+    .ch-row-title {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--text-1);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .ch-row-count {
+      font-size: 15px;
+      font-weight: 400;
+      color: var(--text-2);
+      margin-left: 8px;
+    }
+    .see-all-btn {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent);
+      padding: 7px 18px;
+      border: 1.5px solid var(--accent);
+      border-radius: 50px;
+      transition: all var(--transition);
+      white-space: nowrap;
+    }
+    .see-all-btn:hover {
+      background: var(--accent);
+      color: white;
+    }
+    .slider-wrapper {
+      position: relative;
+    }
+    .slider-outer { overflow: hidden; }
+    .slider-track {
+      display: flex;
+      gap: 14px;
+      transition: transform 0.38s cubic-bezier(0.4,0,0.2,1);
+      will-change: transform;
+    }
+
+    /* Video card in slider */
+    .vid-card {
+      flex-shrink: 0;
+      width: calc((100% - 4 * 14px) / 5);
+      cursor: pointer;
+    }
+    /* Portrait / social-media card — 9:16 aspect ratio, 7 visible per row */
+    .vid-card.portrait {
+      width: calc((100% - 6 * 14px) / 7);
+    }
+    .vid-card.portrait .vid-thumb {
+      aspect-ratio: 9/16;
+    }
+    .vid-card:hover .vid-thumb img { transform: scale(1.07); }
+    .vid-card:hover .vid-title { color: var(--accent-light); }
+    .vid-thumb {
+      position: relative;
+      aspect-ratio: 16/9;
+      border-radius: var(--radius-m);
+      overflow: hidden;
+      background: var(--surf-2);
+    }
+    .vid-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.32s ease;
+    }
+    .vid-play-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.35);
+      opacity: 0;
+      transition: opacity var(--transition);
+    }
+    .vid-play-circle {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.92);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      color: #0d0f14;
+    }
+    .vid-card:hover .vid-play-overlay { opacity: 1; }
+    .vid-info { padding: 9px 2px 0; }
+    .vid-title {
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.42;
+      color: var(--text-1);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      transition: color var(--transition);
+    }
+    .vid-meta {
+      font-size: 11px;
+      color: var(--text-2);
+      margin-top: 5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Arrows */
+    .arrow-btn {
+      position: absolute;
+      top: calc(50% - 28px);
+      transform: translateY(-50%);
+      z-index: 10;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--surf-2);
+      border: 1.5px solid var(--border);
+      color: var(--text-1);
+      font-size: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity var(--transition), background var(--transition), border-color var(--transition), transform var(--transition);
+      box-shadow: var(--shadow-card);
+    }
+    .slider-wrapper:hover .arrow-btn:not(:disabled) { opacity: 1; }
+    .arrow-btn:hover:not(:disabled) {
+      background: var(--surf-3);
+      border-color: var(--accent);
+      transform: translateY(-50%) scale(1.1);
+    }
+    .arrow-btn.prev { left: -22px; }
+    .arrow-btn.next { right: -22px; }
+    .arrow-btn:disabled { opacity: 0 !important; cursor: not-allowed; }
+
+    /* ══════════════════════════════════════════
+       VIDEO DETAIL PAGE
+    ══════════════════════════════════════════ */
+    .vd-container { padding: 32px 0 72px; }
+    .vd-back-row  { margin-bottom: 24px; }
+    .vd-main-grid {
+      display: grid;
+      grid-template-columns: 3fr 2fr;
+      gap: 36px;
+      align-items: start;
+      margin-bottom: 52px;
+    }
+    @media (max-width: 900px) { .vd-main-grid { grid-template-columns: 1fr; } }
+    /* Player column */
+    #vd-hls-video {
+      width: 100%;
+      aspect-ratio: 16/9;
+      display: block;
+      background: #000;
+      border-radius: var(--radius-m);
+    }
+    #vd-sd-player {
+      width: 100%;
+      display: block;
+      border-radius: var(--radius-m);
+      overflow: hidden;
+    }
+    /* Meta column */
+    .vd-meta-col { padding-top: 4px; }
+    .vd-title {
+      font-size: 22px;
+      font-weight: 800;
+      line-height: 1.35;
+      color: var(--text-1);
+      margin-bottom: 14px;
+    }
+    .vd-date-row {
+      font-size: 14px;
+      color: var(--text-2);
+      margin-bottom: 6px;
+    }
+    .vd-dur-row {
+      font-size: 14px;
+      color: var(--text-2);
+      margin-bottom: 20px;
+    }
+    .vd-channel-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--accent-bg);
+      border: 1px solid rgba(119,210,200,0.3);
+      border-radius: 50px;
+      padding: 7px 16px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent);
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+    .vd-channel-pill:hover { background: var(--accent-bg2); border-color: var(--accent); }
+    /* Related slider */
+    .vd-related-label {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--text-1);
+      margin-bottom: 20px;
+      padding-top: 4px;
+      border-top: 1px solid var(--border);
+      padding-top: 28px;
+    }
+
+    /* ══════════════════════════════════════════
+       CHANNEL DETAIL VIEW
+    ══════════════════════════════════════════ */
+    .ch-detail-header {
+      padding: 36px 0 28px;
+    }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-2);
+      margin-bottom: 20px;
+      transition: color var(--transition);
+    }
+    .back-link:hover { color: var(--text-1); }
+    .ch-detail-title {
+      font-size: clamp(24px, 4vw, 38px);
+      font-weight: 900;
+      color: var(--text-1);
+      line-height: 1.15;
+    }
+    .ch-detail-count {
+      font-size: clamp(18px, 2vw, 22px);
+      font-weight: 400;
+      color: var(--text-2);
+      margin-left: 10px;
+    }
+
+    /* KLG channel video grid */
+    .klg-ch-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+      gap: 20px 18px;
+      padding-bottom: 60px;
+    }
+    .klg-ch-grid .vid-card {
+      width: 100%;
+      cursor: pointer;
+      border-radius: var(--radius-m);
+      overflow: hidden;
+      background: var(--surf-1);
+      border: 1px solid var(--border);
+      transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+    }
+    .klg-ch-grid .vid-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--border-hover);
+      box-shadow: var(--shadow-card);
+    }
+    .klg-ch-grid .vid-thumb {
+      position: relative;
+      aspect-ratio: 16/9;
+      overflow: hidden;
+      background: var(--surf-2);
+    }
+    .klg-ch-grid .vid-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.4s ease;
+    }
+    .klg-ch-grid .vid-card:hover .vid-thumb img { transform: scale(1.04); }
+    .klg-ch-grid .vid-play-overlay {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0);
+      transition: background 0.2s ease;
+    }
+    .klg-ch-grid .vid-card:hover .vid-play-overlay { background: rgba(0,0,0,0.35); }
+    .klg-ch-grid .vid-play-circle {
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.15);
+      border: 2px solid rgba(255,255,255,0.7);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; color: #fff;
+      opacity: 0; transform: scale(0.8);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+    .klg-ch-grid .vid-card:hover .vid-play-circle { opacity: 1; transform: scale(1); }
+    .klg-ch-grid .vid-info {
+      padding: 10px 12px 12px;
+    }
+    .klg-ch-grid .vid-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-1);
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      margin-bottom: 4px;
+    }
+    .klg-ch-grid .vid-meta {
+      font-size: 11.5px;
+      color: var(--text-2);
+    }
+
+    /* ══════════════════════════════════════════
+       FOOTER
+    ══════════════════════════════════════════ */
+    .site-footer {
+      background: var(--surf-1);
+      border-top: 1px solid var(--border);
+      padding: 48px 0 36px;
+      margin-top: 24px;
+    }
+    .footer-body {
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+    .footer-top {
+      display: flex;
+      gap: 40px;
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+    .footer-logo img {
+      height: 42px;
+      filter: brightness(0) saturate(100%) invert(78%) sepia(25%) saturate(741%) hue-rotate(137deg) brightness(103%) contrast(92%);
+      opacity: 0.75;
+    }
+    .footer-address {
+      font-size: 13px;
+      color: var(--text-2);
+      line-height: 1.9;
+    }
+    .footer-address a { color: var(--accent); transition: color var(--transition); }
+    .footer-address a:hover { color: var(--accent-light); }
+    .footer-bottom {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 20px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+    }
+    .footer-bottom a {
+      font-size: 13px;
+      color: var(--text-2);
+      transition: color var(--transition);
+    }
+    .footer-bottom a:hover { color: var(--text-1); }
+
+    /* ══════════════════════════════════════════
+       LOADING
+    ══════════════════════════════════════════ */
+    .page-loader {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      gap: 20px;
+      transition: opacity 0.5s ease;
+    }
+    .page-loader.hidden { opacity: 0; pointer-events: none; }
+    .loader-logo img { height: 44px; filter: brightness(0) invert(1); opacity: 0.6; }
+    .loader-spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid rgba(255,255,255,0.1);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Placeholder shimmer */
+    .shimmer {
+      background: linear-gradient(90deg, var(--surf-1) 25%, var(--surf-2) 50%, var(--surf-1) 75%);
+      background-size: 200% 100%;
+      animation: shim 1.4s infinite;
+    }
+    @keyframes shim { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+    /* ══════════════════════════════════════════
+       PROTOTYPE BADGE
+    ══════════════════════════════════════════ */
+    .proto-badge {
+      position: fixed;
+      bottom: 18px;
+      right: 18px;
+      background: rgba(255,255,255,0.06);
+      color: var(--text-3);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      padding: 5px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ══ LOADING SCREEN ══ -->
+  <div class="page-loader" id="page-loader">
+    <div class="loader-logo">
+      <img src="https://www.klagenfurt.at/_assets/3aac61a435988e1bf9abea60ea0f7ca7/Images/logo-small.svg" alt="Klagenfurt"
+           style="filter: brightness(0) saturate(100%) invert(78%) sepia(25%) saturate(741%) hue-rotate(137deg) brightness(103%) contrast(92%); opacity:0.8;">
+    </div>
+    <div class="loader-spinner"></div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       MAIN VIEW
+  ════════════════════════════════════════ -->
+  <div id="main-view">
+
+    <header class="site-header">
+      <div class="site-header-logo">
+        <a href="#" onclick="showMain(event)">
+          <img src="https://www.klagenfurt.at/_assets/3aac61a435988e1bf9abea60ea0f7ca7/Images/logo-small.svg" alt="Klagenfurt">
+          <span class="site-header-title">Klagenfurt TV</span>
+        </a>
+      </div>
+    </header>
+
+    <!-- Hero: full-width featured + thumbs bar below -->
+    <section class="hero">
+      <div class="hero-featured" id="hero-featured" onclick="playHero()">
+        <img id="hero-img" src="" alt="">
+        <div class="hero-gradient"></div>
+        <div class="hero-overlay">
+          <div class="container">
+            <div class="hero-main-title" id="hero-title">Wird geladen…</div>
+            <div class="hero-main-meta" id="hero-meta"></div>
+            <button class="hero-play-btn">▶ &nbsp;Jetzt ansehen</button>
+          </div>
+        </div>
+      </div>
+      <div class="hero-thumbs-bar">
+        <div class="hero-list" id="hero-list">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Category Filter (ORF ON tiles) -->
+    <div class="categories-section">
+      <div class="cat-nav-wrap">
+        <button class="cat-nav-btn prev" id="cat-prev" onclick="catScroll(-1)" disabled>&#8249;</button>
+        <div class="cat-scroll-outer" id="cat-scroll-outer">
+          <div class="cat-scroll-inner" id="cat-scroll">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+        <button class="cat-nav-btn next" id="cat-next" onclick="catScroll(1)">&#8250;</button>
+      </div>
+      <div class="cat-expanded" id="cat-expanded">
+        <div class="cat-expanded-inner">
+          <div class="cat-expanded-label" id="cat-expanded-label">Kanäle</div>
+          <div class="channels-grid" id="cat-channels-grid"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Channel Sliders -->
+    <div class="container sliders-wrap">
+      <div id="sliders-container">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+      <div class="container">
+        <div class="footer-body">
+          <div class="footer-top">
+            <div class="footer-logo">
+              <img src="https://www.klagenfurt.at/_assets/3aac61a435988e1bf9abea60ea0f7ca7/Images/logo.svg" alt="Klagenfurt">
+            </div>
+            <div class="footer-address">
+              Magistrat der Landeshauptstadt Klagenfurt am Wörthersee<br>
+              Rathaus, Neuer Platz 1 &nbsp;·&nbsp; 9010 Klagenfurt am Wörthersee &nbsp;·&nbsp; Österreich<br>
+              <a href="tel:+43463537​0">+43 463 537 0</a> &nbsp;·&nbsp; <a href="mailto:info@klagenfurt.at">info@klagenfurt.at</a>
+            </div>
+          </div>
+          <div class="footer-bottom">
+            <a href="https://www.klagenfurt.at/impressum" target="_blank">Impressum</a>
+            <a href="https://www.klagenfurt.at/e-mail-policy" target="_blank">E-Mail Policy</a>
+            <a href="https://www.klagenfurt.at/sitemap" target="_blank">Sitemap</a>
+            <a href="https://www.klagenfurt.at/barrierefreiheitserklaerung" target="_blank">Barrierefreiheit</a>
+            <a href="https://www.klagenfurt.at/datenschutz" target="_blank">Datenschutz</a>
+            <a href="javascript:void(0)">Privatsphäre</a>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+  </div><!-- /#main-view -->
+
+
+  <!-- ════════════════════════════════════════
+       CHANNEL DETAIL VIEW
+  ════════════════════════════════════════ -->
+  <div id="channel-view" style="display:none">
+
+    <header class="site-header">
+      <div class="site-header-logo">
+        <a href="#" onclick="showMain(event)">
+          <img src="https://www.klagenfurt.at/_assets/3aac61a435988e1bf9abea60ea0f7ca7/Images/logo-small.svg" alt="Klagenfurt">
+          <span class="site-header-title">Klagenfurt TV</span>
+        </a>
+      </div>
+    </header>
+
+    <div class="container">
+      <div class="ch-detail-header">
+        <button class="back-link" onclick="showMain(event)">← &nbsp;Zurück zur Mediathek</button>
+        <h1 class="ch-detail-title">
+          <span id="ch-detail-name">Kanal</span>
+          <span class="ch-detail-count" id="ch-detail-count"></span>
+        </h1>
+      </div>
+
+      <!-- v2 widget (used for non-KLG channels) -->
+      <sd-media-library-widget
+        id="channel-lib"
+        tenant-name="prod-internal"
+        view-mode="grid"
+        show-stats="true"
+        style="display:none">
+      </sd-media-library-widget>
+
+      <!-- KLG v1 channel grid (populated by showChannel for klg- channels) -->
+      <div id="klg-channel-grid" class="klg-ch-grid" style="display:none"></div>
+    </div>
+
+    <footer class="site-footer">
+      <div class="container">
+        <div class="footer-body">
+          <div class="footer-top">
+            <div class="footer-logo">
+              <img src="https://www.klagenfurt.at/_assets/3aac61a435988e1bf9abea60ea0f7ca7/Images/logo.svg" alt="Klagenfurt">
+            </div>
+            <div class="footer-address">
+              Magistrat der Landeshauptstadt Klagenfurt am Wörthersee<br>
+              Rathaus, Neuer Platz 1 &nbsp;·&nbsp; 9010 Klagenfurt am Wörthersee &nbsp;·&nbsp; Österreich
+            </div>
+          </div>
+          <div class="footer-bottom">
+            <a href="https://www.klagenfurt.at/impressum" target="_blank">Impressum</a>
+            <a href="https://www.klagenfurt.at/datenschutz" target="_blank">Datenschutz</a>
+            <a href="javascript:void(0)">Privatsphäre</a>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+  </div><!-- /#channel-view -->
+
+
+  <!-- ════════════════════════════════════════
+       VIDEO DETAIL VIEW
+  ════════════════════════════════════════ -->
+  <div id="video-detail-view" style="display:none">
+    <header class="site-header">
+      <div class="site-header-logo">
+        <a href="#" onclick="closeVideoDetail(event)">
+          <img src="https://www.klagenfurt.at/_assets/3aac61a435988e1bf9abea60ea0f7ca7/Images/logo-small.svg" alt="Klagenfurt">
+          <span class="site-header-title">Klagenfurt TV</span>
+        </a>
+      </div>
+    </header>
+
+    <div class="container vd-container">
+      <div class="vd-back-row">
+        <button class="back-link" onclick="closeVideoDetail()">← &nbsp;Zurück zur Mediathek</button>
+      </div>
+
+      <div class="vd-main-grid">
+        <!-- Left: video player -->
+        <div class="vd-player-col">
+          <video id="vd-hls-video" controls playsinline></video>
+          <sd-media-widget id="vd-sd-player" tenant-name="prod-internal" style="display:none"></sd-media-widget>
+        </div>
+
+        <!-- Right: metadata -->
+        <div class="vd-meta-col">
+          <h1 class="vd-title" id="vd-title"></h1>
+          <div class="vd-date-row" id="vd-date"></div>
+          <div class="vd-dur-row"  id="vd-duration"></div>
+          <div id="vd-channel"></div>
+        </div>
+      </div>
+
+      <!-- Below: same-channel slider -->
+      <div id="vd-related">
+        <div class="vd-related-label" id="vd-related-label" style="display:none"></div>
+        <div id="vd-sliders-container"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Prototype badge -->
+  <div class="proto-badge">PROTOTYPE</div>
+
+
+  <script>
+    /* ════════════════════════════════════════
+       CONSTANTS & STATE
+    ════════════════════════════════════════ */
+    const API    = 'https://api.streamdiver.com/v2';
+    const TENANT = 'prod-internal';
+
+    /* ── Klagenfurt real content (v1 library) ────────────────────── */
+    const KLG_VIDEOS = {
+      'klg-37-gemeinderatssitzung': {
+        id:        'klg-37-gemeinderatssitzung',
+        name:      '37. Gemeinderatssitzung',
+        date:      '11.02.2026',
+        thumbnail: { url: 'https://base.streamdiver.com/klagenfurt/thumbnails/695a8abb-ad6f-4775-abf0-da4fed097779/preview' },
+        hlsUrl:    'https://at-cdn14.streamdiver.com/vod-klagenfurt/_definst_/amlst:2026/02/e7fbed6b-9590-4920-a738-d116c7701caf/playlist.m3u8',
+        file:      {}
+      },
+      'klg-sprechstunde-buergermeister': {
+        id:        'klg-sprechstunde-buergermeister',
+        name:      'Sprechstunde mit dem Bürgermeister vom 12.03.2026',
+        date:      '13.03.2026',
+        thumbnail: { url: 'https://base.streamdiver.com/klagenfurt/thumbnails/fc0fa6b3-b92f-4f12-95c0-ccd06247be28/preview' },
+        hlsUrl:    'https://at-cdn14.streamdiver.com/vod-klagenfurt/_definst_/amlst:2026/03/0f62f705-f10f-44b2-acda-16d0feb14bea/playlist.m3u8',
+        file:      {}
+      },
+      'klg-buergerservice': {
+        id:        'klg-buergerservice',
+        name:      'Bürgerservice',
+        date:      '06.09.2022',
+        thumbnail: { url: 'https://base.streamdiver.com/klagenfurt/thumbnails/d1b29e60-5219-47ec-a396-97413f469273/preview' },
+        hlsUrl:    'https://at-cdn14.streamdiver.com/vod-klagenfurt/_definst_/amlst:2022/09/2428b289-c89b-452a-8237-4e93a214836f/playlist.m3u8',
+        file:      {}
+      },
+      'klg-fit-aktiv-alter-folge8': {
+        id:        'klg-fit-aktiv-alter-folge8',
+        name:      'Fit und aktiv im Alter – Folge 8 – Gehirntraining mittels Bewegung',
+        date:      '09.03.2021',
+        thumbnail: { url: 'https://klagenfurt.streamdiver.com/assets/images/klagenfurt/startframe_854x480.png' },
+        hlsUrl:    'https://at-cdn14.streamdiver.com/vod-klagenfurt/_definst_/amlst:2021/03/2bb72cf9-61df-4cb6-997d-cce49140da44/playlist.m3u8',
+        file:      {}
+      },
+      /* ── Gemeinderats-TV slider videos ── */
+      'klg-36-gemeinderatssitzung': {
+        id:        'klg-36-gemeinderatssitzung',
+        name:      '36. Gemeinderatssitzung',
+        date:      '16.12.2025',
+        thumbnail: { url: 'https://base.streamdiver.com/klagenfurt/thumbnails/2f95c57d-76e1-4baa-98ca-2a6890c317b3/preview' },
+        hlsUrl:    'https://at-cdn14.streamdiver.com/vod-klagenfurt/_definst_/amlst:2025/12/111ddba5-23a7-4b43-ba6f-c291176a573d/playlist.m3u8',
+        file:      {}
+      },
+      'klg-35-gemeinderatssitzung': {
+        id:        'klg-35-gemeinderatssitzung',
+        name:      '35. Gemeinderatssitzung',
+        date:      '21.11.2025',
+        thumbnail: { url: 'https://base.streamdiver.com/klagenfurt/thumbnails/1b515045-0077-4fe7-bd26-fc171041c3ba/preview' },
+        hlsUrl:    'https://at-cdn14.streamdiver.com/vod-klagenfurt/_definst_/amlst:2025/11/69c59e4c-62e9-40b0-acd1-9f896be6c21a/playlist.m3u8',
+        file:      {}
+      },
+      'klg-34-gemeinderatssitzung': {
+        id:        'klg-34-gemeinderatssitzung',
+        name:      '34. Gemeinderatssitzung',
+        date:      '21.10.2025',
+        thumbnail: { url: 'https://base.streamdiver.com/klagenfurt/thumbnails/f6f54daa-d4b4-4c18-9d68-838262930772/preview' },
+        hlsUrl:    'https://at-cdn14.streamdiver.com/vod-klagenfurt/_definst_/amlst:2025/10/a774c614-54b9-48db-aeb0-2ce92d75c626/playlist.m3u8',
+        file:      {}
+      },
+      'klg-33-gemeinderatssitzung': {
+        id:        'klg-33-gemeinderatssitzung',
+        name:      '33. Gemeinderatssitzung',
+        date:      '17.09.2025',
+        thumbnail: { url: 'https://base.streamdiver.com/klagenfurt/thumbnails/ac625732-bc5b-4714-b2db-a40098bbcc07/preview' },
+        hlsUrl:    'https://at-cdn14.streamdiver.com/vod-klagenfurt/_definst_/amlst:2025/09/9f9ea676-3461-4573-ad84-1e0dc3d83899/playlist.m3u8',
+        file:      {}
+      },
+      /* ── Bürgerservice slider videos ── */
+      'klg-reportage-fundamt': {
+        id:        'klg-reportage-fundamt',
+        name:      'Die Reportage: Die "Schätze" im Fundamt',
+        date:      '09.03.2022',
+        thumbnail: { url: 'https://base.streamdiver.com/klagenfurt/thumbnails/e3ed7c88-cc0b-4272-a284-9a275b4c1381/preview' },
+        hlsUrl:    'https://at-cdn14.streamdiver.com/vod-klagenfurt/_definst_/amlst:2022/03/c9904197-6dd2-4e67-9b9e-4d0f43bed8d8/playlist.m3u8',
+        file:      {}
+      },
+      'klg-messerattacke-expertentalk': {
+        id:        'klg-messerattacke-expertentalk',
+        name:      'Nach Messerattacke: Expertentalk zum Thema Sicherheit',
+        date:      '03.02.2022',
+        thumbnail: { url: 'https://klagenfurt.streamdiver.com/assets/images/klagenfurt/startframe_854x480.png' },
+        hlsUrl:    'https://at-cdn14.streamdiver.com/vod-klagenfurt/_definst_/amlst:2022/02/05e6bc66-bbda-4d30-89d4-7d74c7836fed/playlist.m3u8',
+        file:      {}
+      },
+      'klg-impfbus-klagenfurt': {
+        id:        'klg-impfbus-klagenfurt',
+        name:      'Der Impfbus in Klagenfurt - aktuelle Infos',
+        date:      '15.09.2021',
+        thumbnail: { url: 'https://base.streamdiver.com/klagenfurt/thumbnails/d155c3c9-538c-41d2-afc0-969f329cabb0/preview' },
+        hlsUrl:    'https://at-cdn14.streamdiver.com/vod-klagenfurt/_definst_/amlst:2021/09/5ee47282-7e75-4631-95a3-fbdfb2702327/playlist.m3u8',
+        file:      {}
+      },
+      'klg-klagenfurt-waehlt-sicher': {
+        id:        'klg-klagenfurt-waehlt-sicher',
+        name:      'Klagenfurt wählt sicher - Wählen am Vorwahltag oder direkt am Wahltag am 28.02.2021',
+        date:      '01.02.2021',
+        thumbnail: { url: 'https://base.streamdiver.com/klagenfurt/thumbnails/6711c09e-5e81-4db4-aadb-01de006af5e2/preview' },
+        hlsUrl:    'https://at-cdn14.streamdiver.com/vod-klagenfurt/_definst_/amlst:2021/02/f0aed12a-60be-4b95-b3b8-24831228ad64/playlist.m3u8',
+        file:      {}
+      }
+    };
+
+    /* ── Klagenfurt static channel definitions ─────────────────────── */
+    const KLG_CHANNELS = {
+      'klg-gemeinderats-tv': {
+        id:         'klg-gemeinderats-tv',
+        name:       'Gemeinderats-TV',
+        mediaCount: 35
+      },
+      'klg-buergerservice-ch': {
+        id:         'klg-buergerservice-ch',
+        name:       'Bürgerservice',
+        mediaCount: 15
+      },
+      'klg-direkte-draht-ch': {
+        id:         'klg-direkte-draht-ch',
+        name:       'Der Direkte Draht',
+        mediaCount: 89
+      },
+      'klg-seniorenbuero-ch': {
+        id:         'klg-seniorenbuero-ch',
+        name:       'Seniorenbüro 50+',
+        mediaCount: 16
+      }
+    };
+
+    /* ── Channel ↔ video membership map (for detail page related slider) ── */
+    const KLG_VIDEO_CHANNELS = {
+      'klg-gemeinderats-tv':  ['klg-37-gemeinderatssitzung','klg-36-gemeinderatssitzung','klg-35-gemeinderatssitzung','klg-34-gemeinderatssitzung','klg-33-gemeinderatssitzung'],
+      'klg-direkte-draht-ch': ['klg-sprechstunde-buergermeister','klg-interview-katzenberger','klg-interview-seboe','klg-interview-trattler','klg-interview-jandl'],
+      'klg-buergerservice-ch':['klg-buergerservice','klg-reportage-fundamt','klg-messerattacke-expertentalk','klg-impfbus-klagenfurt','klg-klagenfurt-waehlt-sicher'],
+      'klg-seniorenbuero-ch': ['klg-fit-aktiv-folge10','klg-fit-aktiv-folge9','klg-fit-aktiv-alter-folge8','klg-fit-aktiv-folge7','klg-fit-aktiv-folge6','klg-fit-aktiv-folge5','klg-fit-aktiv-folge4'],
+    };
+
+    function getVideoChannelId(videoId) {
+      for (const [chId, ids] of Object.entries(KLG_VIDEO_CHANNELS))
+        if (ids.includes(videoId)) return chId;
+      return null;
+    }
+
+    function getChannelVideos(channelId) {
+      return (KLG_VIDEO_CHANNELS[channelId] || []).map(id => KLG_VIDEOS[id]).filter(Boolean);
+    }
+
+    /* ── Der Direkte Draht slider videos (added to lookup so openVideoDetail works) ── */
+    Object.assign(KLG_VIDEOS, {
+      'klg-interview-katzenberger': {
+        id:        'klg-interview-katzenberger',
+        name:      'Interview mit Joachim Katzenberger, MA',
+        date:      '17.12.2025',
+        thumbnail: { url: 'https://base.streamdiver.com/klagenfurt/thumbnails/21f52290-26a6-4db2-888d-c19575ba1307/preview' },
+        hlsUrl:    'https://at-cdn14.streamdiver.com/vod-klagenfurt/_definst_/amlst:2025/12/9131213b-86dc-4cd7-81f6-a9333d9a4d4c/playlist.m3u8',
+        file:      {}
+      },
+      'klg-interview-seboe': {
+        id:        'klg-interview-seboe',
+        name:      'Interview mit DI Bmstr Daniel Sebö BSc',
+        date:      '10.11.2025',
+        thumbnail: { url: 'https://base.streamdiver.com/klagenfurt/thumbnails/a592ec83-1215-41a8-90fa-e257f3e1a43b/preview' },
+        hlsUrl:    'https://at-cdn14.streamdiver.com/vod-klagenfurt/_definst_/amlst:2025/11/2d790dc0-0dc9-486a-81f0-20d3b16758de/playlist.m3u8',
+        file:      {}
+      },
+      'klg-interview-trattler': {
+        id:        'klg-interview-trattler',
+        name:      'Interview mit Dr.in Birgit Trattler',
+        date:      '13.10.2025',
+        thumbnail: { url: 'https://base.streamdiver.com/klagenfurt/thumbnails/145b07b6-3487-4966-9a0e-f655b2d38e5a/preview' },
+        hlsUrl:    'https://at-cdn14.streamdiver.com/vod-klagenfurt/_definst_/amlst:2025/10/a01b5c30-aeda-4a80-9886-f208e052b9e2/playlist.m3u8',
+        file:      {}
+      },
+      'klg-interview-jandl': {
+        id:        'klg-interview-jandl',
+        name:      'Interview mit Mag.a Isabella Jandl, Magistratsdirektorin',
+        date:      '16.07.2025',
+        thumbnail: { url: 'https://base.streamdiver.com/klagenfurt/thumbnails/6d9b6444-b740-47f0-aef4-808acc0952e2/preview' },
+        hlsUrl:    'https://at-cdn14.streamdiver.com/vod-klagenfurt/_definst_/amlst:2025/07/618ad6cd-bdd5-41d9-b1bd-6c486dd7c747/playlist.m3u8',
+        file:      {}
+      },
+    });
+
+    /* ── Seniorenbüro 50+ slider videos ──────────────────────────── */
+    Object.assign(KLG_VIDEOS, {
+      'klg-fit-aktiv-folge10': {
+        id:        'klg-fit-aktiv-folge10',
+        name:      'Fit und aktiv im Alter - Folge 10 - Kräftigungsübungen',
+        date:      '09.03.2021',
+        thumbnail: { url: 'https://base.streamdiver.com/klagenfurt/thumbnails/359238a2-b712-4c0d-bf6d-5f0159e18457/preview' },
+        hlsUrl:    'https://at-cdn14.streamdiver.com/vod-klagenfurt/_definst_/amlst:2021/03/e6d78c22-bb26-4a04-b542-f8d7e9a4f7e0/playlist.m3u8',
+        file:      {}
+      },
+      'klg-fit-aktiv-folge9': {
+        id:        'klg-fit-aktiv-folge9',
+        name:      'Fit und aktiv im Alter - Folge 9 - Übungen für die Arme',
+        date:      '09.03.2021',
+        thumbnail: { url: 'https://base.streamdiver.com/klagenfurt/thumbnails/ea9a5b2d-7ba3-4ea8-b68d-0d9d0630e7fa/preview' },
+        hlsUrl:    'https://at-cdn14.streamdiver.com/vod-klagenfurt/_definst_/amlst:2021/03/a87df33f-de0c-4714-877c-1d16ad83c1c4/playlist.m3u8',
+        file:      {}
+      },
+      'klg-fit-aktiv-folge7': {
+        id:        'klg-fit-aktiv-folge7',
+        name:      'Fit und aktiv im Alter - Folge 7 - Übungen im Liegen für Hüfte und Rumpf',
+        date:      '03.03.2021',
+        thumbnail: { url: 'https://base.streamdiver.com/klagenfurt/thumbnails/a096a876-33e4-4b51-b9cd-161ba7322218/preview' },
+        hlsUrl:    'https://at-cdn14.streamdiver.com/vod-klagenfurt/_definst_/amlst:2021/03/00accd57-0f93-4ca3-91ae-9dadf9d7afb8/playlist.m3u8',
+        file:      {}
+      },
+      'klg-fit-aktiv-folge6': {
+        id:        'klg-fit-aktiv-folge6',
+        name:      'Fit und aktiv im Alter - Folge 6 - Kräftigungsübungen',
+        date:      '24.02.2021',
+        thumbnail: { url: 'https://base.streamdiver.com/klagenfurt/thumbnails/7fd4c2e9-9fda-4c2f-b17e-d4729bd9c9fa/preview' },
+        hlsUrl:    'https://at-cdn14.streamdiver.com/vod-klagenfurt/_definst_/amlst:2021/02/26ce3f46-c7c0-4ac1-aaa9-b7149908f784/playlist.m3u8',
+        file:      {}
+      },
+      'klg-fit-aktiv-folge5': {
+        id:        'klg-fit-aktiv-folge5',
+        name:      'Fit und aktiv im Alter - Folge 5 - Kräftigungsübungen für die Beine',
+        date:      '17.02.2021',
+        thumbnail: { url: 'https://base.streamdiver.com/klagenfurt/thumbnails/f61e60e9-3231-47d0-8c84-6f67172a2366/preview' },
+        hlsUrl:    'https://at-cdn14.streamdiver.com/vod-klagenfurt/_definst_/amlst:2021/02/40750a7c-7110-4750-83ff-a4adc33ba8b4/playlist.m3u8',
+        file:      {}
+      },
+      'klg-fit-aktiv-folge4': {
+        id:        'klg-fit-aktiv-folge4',
+        name:      'Fit und aktiv im Alter - Folge 4 - Kräftigungsübungen auf der Matte',
+        date:      '10.02.2021',
+        thumbnail: { url: 'https://base.streamdiver.com/klagenfurt/thumbnails/763e811e-87ab-47f5-995b-3751c06e8b94/preview' },
+        hlsUrl:    'https://at-cdn14.streamdiver.com/vod-klagenfurt/_definst_/amlst:2021/02/df031f1b-5463-47f9-98d9-6e1b67c07a0b/playlist.m3u8',
+        file:      {}
+      },
+    });
+
+    const CATEGORIES = [
+      'Alle Videos', 'Aktuelles', 'Bürgerservice', 'Der Direkte Draht',
+      'Stadtregierung', 'Gemeinderats-TV', 'Wirtschaft & Infrastruktur',
+      'Kultur & Brauchtum', 'Sport', 'Tourismus & Freizeit',
+      'Einrichtungen', 'Seniorenbüro 50+', 'Covid-19'
+    ];
+
+    let token         = null;
+    let allChannels   = [];
+    let heroVideos    = [];
+    let activeHero    = 0;
+    let activeCat     = null;
+    let sliderPos     = {};   // channelId → current offset index
+    let sliderVisible = {};   // channelId → visible card count
+
+    /* ════════════════════════════════════════
+       API HELPERS
+    ════════════════════════════════════════ */
+    async function getToken() {
+      const r = await fetch(`${API}/tokens/public`, {
+        method: 'POST',
+        headers: { 'X-SD-Tenant-Shortcode': TENANT, 'X-SD-Features': 'widgets' }
+      });
+      const d = await r.json();
+      return d.data.accessToken;
+    }
+
+    async function fetchChannels() {
+      const r = await fetch(`${API}/channels?pageSize=30`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const d = await r.json();
+      return d.data || [];
+    }
+
+    async function fetchMedia(channelId, size = 8) {
+      const p = new URLSearchParams({ pageSize: String(size) });
+      if (channelId) p.set('channelIds', channelId);
+      const r = await fetch(`${API}/media?${p}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const d = await r.json();
+      // Filter for video/audio only (exclude images)
+      return (d.data || []).filter(m => m.type !== 'image' && !m.file?.mimeType?.includes('image'));
+    }
+
+    /* ════════════════════════════════════════
+       FORMATTING
+    ════════════════════════════════════════ */
+    function fmtDur(dur) {
+      if (!dur) return '';
+      const [h, m, s] = dur.split(':');
+      return h === '00' ? `${parseInt(m)}:${s}` : `${parseInt(h)}:${m}:${s}`;
+    }
+
+    function fmtViews(n) {
+      if (!n || n === 0) return '';
+      return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n);
+    }
+
+    function esc(str) {
+      return String(str || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    }
+
+    function fallbackThumb() {
+      return `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 9"><rect fill="#1a1e2a" width="16" height="9"/><text x="8" y="5" text-anchor="middle" font-size="2" fill="#515e72" dy=".3em">▶</text></svg>')}`;
+    }
+
+    /* ════════════════════════════════════════
+       HERO
+    ════════════════════════════════════════ */
+    function renderHero(videos) {
+      // All 4 Hero slots = real Klagenfurt v1 content
+      heroVideos = [
+        KLG_VIDEOS['klg-37-gemeinderatssitzung'],
+        KLG_VIDEOS['klg-sprechstunde-buergermeister'],
+        KLG_VIDEOS['klg-buergerservice'],
+        KLG_VIDEOS['klg-fit-aktiv-alter-folge8'],
+      ];
+      const list = document.getElementById('hero-list');
+      list.innerHTML = heroVideos.map((v, i) => `
+        <div class="hero-item ${i === 0 ? 'active' : ''}"
+             onmouseenter="setHero(${i})"
+             onclick="openVideoDetail('${v.id}')">
+          <div class="hero-item-thumb">
+            <img src="${v.thumbnail?.url || fallbackThumb()}" alt="" loading="eager"
+                 onerror="this.src='${fallbackThumb()}'">
+          </div>
+          <div style="flex:1;min-width:0">
+            <div class="hero-item-title">${v.name || 'Video'}</div>
+            <div class="hero-item-dur">${v.file?.duration ? fmtDur(v.file.duration) : (v.date || '')}</div>
+          </div>
+        </div>
+      `).join('');
+      setHero(0);
+    }
+
+    function setHero(idx) {
+      activeHero = idx;
+      const v = heroVideos[idx];
+      if (!v) return;
+
+      const img = document.getElementById('hero-img');
+      img.style.opacity = '0';
+      img.style.transition = 'opacity 0.25s ease, transform 0.5s ease';
+      setTimeout(() => {
+        img.src = v.thumbnail?.url || fallbackThumb();
+        img.onerror = () => { img.src = fallbackThumb(); };
+        img.alt = v.name || '';
+        img.style.opacity = '1';
+      }, 140);
+
+      document.getElementById('hero-title').textContent = v.name || 'Video';
+      const meta = v.file?.duration
+        ? fmtDur(v.file.duration) + (v.date ? ' · ' + v.date : '')
+        : (v.date || '');
+      document.getElementById('hero-meta').innerHTML = meta;
+      document.getElementById('hero-featured').dataset.vid = v.id;
+      document.getElementById('hero-featured').dataset.title = v.name || '';
+
+      document.querySelectorAll('.hero-item').forEach((el, i) =>
+        el.classList.toggle('active', i === idx)
+      );
+    }
+
+    function playHero() {
+      const el = document.getElementById('hero-featured');
+      openVideoDetail(el.dataset.vid);
+    }
+
+    /* ════════════════════════════════════════
+       CATEGORIES  (ORF ON tile style)
+    ════════════════════════════════════════ */
+    let catOffset = 0;  // how many pixels we have translated the tile track
+
+    function renderCategories() {
+      const scroll = document.getElementById('cat-scroll');
+      scroll.innerHTML = CATEGORIES.map((cat, i) => `
+        <button class="cat-tile${i === 0 ? ' active' : ''}"
+                onclick="toggleCat('${esc(cat)}')"
+                data-cat="${esc(cat)}">
+          ${cat}
+        </button>
+      `).join('');
+      // initialise arrow state after tiles exist
+      setTimeout(updateCatArrows, 0);
+    }
+
+    function catScroll(dir) {
+      const outer = document.getElementById('cat-scroll-outer');
+      const inner = document.getElementById('cat-scroll');
+      const step  = outer.clientWidth * 0.6;
+      const maxOff = Math.max(0, inner.scrollWidth - outer.clientWidth);
+      catOffset = Math.min(maxOff, Math.max(0, catOffset + dir * step));
+      inner.style.transform = `translateX(-${catOffset}px)`;
+      updateCatArrows();
+    }
+
+    function updateCatArrows() {
+      const outer  = document.getElementById('cat-scroll-outer');
+      const inner  = document.getElementById('cat-scroll');
+      const maxOff = Math.max(0, inner.scrollWidth - outer.clientWidth);
+      document.getElementById('cat-prev').disabled = catOffset <= 0;
+      document.getElementById('cat-next').disabled = catOffset >= maxOff - 1;
+    }
+
+    function toggleCat(cat) {
+      const panel = document.getElementById('cat-expanded');
+      const grid  = document.getElementById('cat-channels-grid');
+      const label = document.getElementById('cat-expanded-label');
+
+      document.querySelectorAll('.cat-tile').forEach(el =>
+        el.classList.toggle('active', el.dataset.cat === cat)
+      );
+
+      if (activeCat === cat) {
+        activeCat = null;
+        panel.classList.remove('open');
+        return;
+      }
+      activeCat = cat;
+
+      label.textContent = cat === 'Alle Videos'
+        ? 'Alle Kanäle'
+        : 'Kanäle: ' + cat;
+
+      const show = allChannels.filter(c => c.mediaCount > 0).slice(0, 8);
+      grid.innerHTML = show.map(ch => `
+        <div class="ch-card" onclick="showChannel('${ch.id}','${esc(ch.name)}',${ch.mediaCount})">
+          <div class="ch-card-thumb">
+            <img src="${ch.thumbnail?.url || fallbackThumb()}" alt="${esc(ch.name)}" loading="eager"
+                 onerror="this.src='${fallbackThumb()}'">
+          </div>
+          <div class="ch-card-body">
+            <div class="ch-card-name">${ch.name}</div>
+            <div class="ch-card-count">${ch.mediaCount} Videos</div>
+          </div>
+        </div>
+      `).join('');
+
+      panel.classList.add('open');
+    }
+
+    /* ════════════════════════════════════════
+       CHANNEL SLIDERS
+    ════════════════════════════════════════ */
+    function renderSlider(ch, videos, opts = {}) {
+      const portrait   = opts.portrait  || false;
+      const label      = opts.label     || ch.name;
+      const visible    = portrait ? 7 : 5;
+      const targetEl   = opts.container || document.getElementById('sliders-container');
+      sliderPos[ch.id]     = 0;
+      sliderVisible[ch.id] = visible;
+
+      const el = document.createElement('div');
+      el.className = 'ch-row';
+      el.innerHTML = `
+        <div class="ch-row-header">
+          <div style="min-width:0">
+            <span class="ch-row-title">${label}</span>
+            <span class="ch-row-count">${ch.mediaCount} Videos</span>
+          </div>
+          <button class="see-all-btn"
+                  onclick="showChannel('${ch.id}','${esc(label)}',${ch.mediaCount})">
+            Alle Videos &nbsp;→
+          </button>
+        </div>
+        <div class="slider-wrapper" id="sw-${ch.id}">
+          <button class="arrow-btn prev" id="prev-${ch.id}"
+                  onclick="slide('${ch.id}',-1)" disabled>‹</button>
+          <div class="slider-outer" id="so-${ch.id}">
+            <div class="slider-track" id="st-${ch.id}">
+              ${videos.map(v => `
+                <div class="vid-card${portrait ? ' portrait' : ''}"
+                     onclick="openVideoDetail('${v.id}')">
+                  <div class="vid-thumb">
+                    <img src="${v.thumbnail?.url || fallbackThumb()}" alt="${esc(v.name||'')}" loading="eager"
+                         onerror="this.src='${fallbackThumb()}'">
+                    <div class="vid-play-overlay">
+                      <div class="vid-play-circle">▶</div>
+                    </div>
+                  </div>
+                  <div class="vid-info">
+                    <div class="vid-title">${v.name || 'Video'}</div>
+                    <div class="vid-meta">
+                      ${v.file?.duration ? `<span>${fmtDur(v.file.duration)}</span>` : (v.date ? `<span>${v.date}</span>` : '')}
+                    </div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          <button class="arrow-btn next" id="next-${ch.id}"
+                  onclick="slide('${ch.id}',1)">›</button>
+        </div>
+      `;
+      targetEl.appendChild(el);
+      updateArrows(ch.id, videos.length);
+    }
+
+    function slide(chId, dir) {
+      const track   = document.getElementById(`st-${chId}`);
+      const cards   = track.querySelectorAll('.vid-card');
+      const total   = cards.length;
+      const visible = sliderVisible[chId] || 5;
+      const maxPos  = Math.max(0, total - visible);
+
+      sliderPos[chId] = Math.min(maxPos, Math.max(0, (sliderPos[chId] || 0) + dir));
+      const pos = sliderPos[chId];
+
+      const cardW = cards[0]?.offsetWidth || 0;
+      const gap   = 14;
+      track.style.transform = `translateX(-${pos * (cardW + gap)}px)`;
+      updateArrows(chId, total);
+    }
+
+    function updateArrows(chId, total) {
+      const pos     = sliderPos[chId] || 0;
+      const visible = sliderVisible[chId] || 5;
+      const maxPos  = Math.max(0, total - visible);
+      document.getElementById(`prev-${chId}`).disabled = pos <= 0;
+      document.getElementById(`next-${chId}`).disabled = pos >= maxPos;
+    }
+
+    /* ════════════════════════════════════════
+       VIDEO DETAIL PAGE
+    ════════════════════════════════════════ */
+    function openVideoDetail(videoId) {
+      if (!videoId) return;
+
+      const v = KLG_VIDEOS[videoId];
+      const hlsVideo = document.getElementById('vd-hls-video');
+      const sdPlayer = document.getElementById('vd-sd-player');
+
+      // Remember where we came from so the back button returns to the right view
+      const fromChannel = document.getElementById('channel-view').style.display !== 'none';
+      window.__videoDetailOrigin = fromChannel ? 'channel' : 'main';
+
+      // Switch views
+      document.getElementById('main-view').style.display          = 'none';
+      document.getElementById('channel-view').style.display       = 'none';
+      document.getElementById('video-detail-view').style.display  = 'block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      // ── Player setup ────────────────────────────────────────────
+      if (v?.hlsUrl) {
+        hlsVideo.style.display = 'block';
+        sdPlayer.style.display = 'none';
+        if (window.__activeHls) { window.__activeHls.destroy(); window.__activeHls = null; }
+        if (typeof Hls !== 'undefined' && Hls.isSupported()) {
+          const hls = new Hls();
+          hls.loadSource(v.hlsUrl);
+          hls.attachMedia(hlsVideo);
+          hls.on(Hls.Events.MANIFEST_PARSED, () => hlsVideo.play());
+          window.__activeHls = hls;
+        } else if (hlsVideo.canPlayType('application/vnd.apple.mpegurl')) {
+          hlsVideo.src = v.hlsUrl;
+          hlsVideo.play();
+        }
+      } else {
+        hlsVideo.style.display = 'none';
+        sdPlayer.style.display = 'block';
+        sdPlayer.setAttribute('asset-id', videoId);
+      }
+
+      // ── Metadata panel ──────────────────────────────────────────
+      document.getElementById('vd-title').textContent    = v ? v.name : 'Video';
+      document.getElementById('vd-date').textContent     = v?.date || '';
+      document.getElementById('vd-duration').textContent = v?.file?.duration ? fmtDur(v.file.duration) : '';
+
+      const channelId = getVideoChannelId(videoId);
+      const channel   = channelId ? KLG_CHANNELS[channelId] : null;
+      const chEl      = document.getElementById('vd-channel');
+      if (channel) {
+        chEl.innerHTML = `<button class="vd-channel-pill"
+          onclick="showChannel('${channel.id}','${esc(channel.name)}',${channel.mediaCount})">
+          ${channel.name} &nbsp;·&nbsp; ${channel.mediaCount} Videos
+        </button>`;
+      } else {
+        chEl.innerHTML = '';
+      }
+
+      // ── Related slider (same channel, exclude current video) ────
+      const relSliders = document.getElementById('vd-sliders-container');
+      const relLabel   = document.getElementById('vd-related-label');
+      relSliders.innerHTML = '';
+
+      if (channel) {
+        const related = getChannelVideos(channelId).filter(cv => cv.id !== videoId);
+        if (related.length > 0) {
+          relLabel.textContent    = 'Weitere Videos aus ' + channel.name;
+          relLabel.style.display  = 'block';
+          renderSlider(channel, related, { label: channel.name, container: relSliders });
+        } else {
+          relLabel.style.display = 'none';
+        }
+      } else {
+        relLabel.style.display = 'none';
+      }
+    }
+
+    function closeVideoDetail(e) {
+      if (e) e.preventDefault();
+      // Stop playback
+      const hlsVideo = document.getElementById('vd-hls-video');
+      hlsVideo.pause();
+      hlsVideo.src = '';
+      if (window.__activeHls) { window.__activeHls.destroy(); window.__activeHls = null; }
+      document.getElementById('vd-sd-player').removeAttribute('asset-id');
+      // Go back to where we came from
+      document.getElementById('video-detail-view').style.display = 'none';
+      if (window.__videoDetailOrigin === 'channel') {
+        document.getElementById('channel-view').style.display = 'block';
+      } else {
+        document.getElementById('main-view').style.display = 'block';
+      }
+      window.__videoDetailOrigin = null;
+      window.scrollTo({ top: 0 });
+    }
+
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeVideoDetail(); });
+
+    /* ════════════════════════════════════════
+       CHANNEL DETAIL VIEW
+    ════════════════════════════════════════ */
+    function showChannel(id, name, count) {
+      document.getElementById('ch-detail-name').textContent  = name;
+      document.getElementById('ch-detail-count').textContent = count ? `· ${count} Videos` : '';
+      document.getElementById('main-view').style.display         = 'none';
+      document.getElementById('channel-view').style.display      = 'block';
+      document.getElementById('video-detail-view').style.display = 'none';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      const lib     = document.getElementById('channel-lib');
+      const klgGrid = document.getElementById('klg-channel-grid');
+
+      if (id.startsWith('klg-')) {
+        /* ── KLG v1 channel: render local videos as a grid ── */
+        lib.style.display     = 'none';
+        klgGrid.style.display = 'grid';
+        const videos = getChannelVideos(id);
+        // Update count to reflect actual local video count
+        document.getElementById('ch-detail-count').textContent = videos.length ? `· ${videos.length} Videos` : '';
+        if (!videos.length) {
+          klgGrid.innerHTML = `<p style="color:var(--text-2);grid-column:1/-1;padding:40px 0">Keine Videos verfügbar.</p>`;
+          return;
+        }
+        klgGrid.innerHTML = videos.map(v => `
+          <div class="vid-card" onclick="openVideoDetail('${v.id}')">
+            <div class="vid-thumb">
+              <img src="${v.thumbnail?.url || fallbackThumb()}" alt="${esc(v.name||'')}" loading="lazy"
+                   onerror="this.src='${fallbackThumb()}'">
+              <div class="vid-play-overlay">
+                <div class="vid-play-circle">▶</div>
+              </div>
+            </div>
+            <div class="vid-info">
+              <div class="vid-title">${v.name || 'Video'}</div>
+              <div class="vid-meta">${[v.date, v.file?.duration ? fmtDur(v.file.duration) : ''].filter(Boolean).join(' · ')}</div>
+            </div>
+          </div>
+        `).join('');
+      } else {
+        /* ── v2 channel: use Streamdiver media library widget ── */
+        klgGrid.style.display = 'none';
+        lib.style.display     = '';
+        lib.setAttribute('channel-id', id);
+      }
+    }
+
+    function showMain(e) {
+      if (e) e.preventDefault();
+      document.getElementById('main-view').style.display         = 'block';
+      document.getElementById('channel-view').style.display      = 'none';
+      document.getElementById('video-detail-view').style.display = 'none';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    /* ════════════════════════════════════════
+       INIT
+    ════════════════════════════════════════ */
+    async function init() {
+      try {
+        token = await getToken();
+
+        // Parallel load: channels + hero media
+        const [channels, heroMedia] = await Promise.all([
+          fetchChannels(),
+          fetchMedia(null, 12)
+        ]);
+
+        // Store all channels for category expansion
+        allChannels = channels.filter(c => c.mediaCount > 0);
+
+        // Filter video channels for sliders (exclude image-only collections)
+        const videoChannels = allChannels
+          .filter(c => !c.name.toLowerCase().includes('image'))
+          .sort((a, b) => b.mediaCount - a.mediaCount)
+          .slice(0, 4);
+
+        // Load slider videos in parallel
+        const sliderMedia = await Promise.all(
+          videoChannels.map(ch => fetchMedia(ch.id, 10))
+        );
+
+        // Arrange: [0] normal · [3] social media (portrait) · [1] normal · [2] normal
+        const sliderOrder = [
+          { ch: videoChannels[0], media: sliderMedia[0], opts: {} },
+          { ch: videoChannels[3], media: sliderMedia[3], opts: { portrait: true, label: 'Social Media' } },
+          { ch: videoChannels[1], media: sliderMedia[1], opts: {} },
+          { ch: videoChannels[2], media: sliderMedia[2], opts: {} },
+        ];
+
+        // Render everything
+        renderHero(heroMedia);
+        renderCategories();
+
+        // Slider 1: Gemeinderats-TV — real Klagenfurt v1 content
+        const klgGemeinderat = KLG_CHANNELS['klg-gemeinderats-tv'];
+        const klgGemeinderatVideos = [
+          KLG_VIDEOS['klg-37-gemeinderatssitzung'],
+          KLG_VIDEOS['klg-36-gemeinderatssitzung'],
+          KLG_VIDEOS['klg-35-gemeinderatssitzung'],
+          KLG_VIDEOS['klg-34-gemeinderatssitzung'],
+          KLG_VIDEOS['klg-33-gemeinderatssitzung'],
+        ];
+        renderSlider(klgGemeinderat, klgGemeinderatVideos, { label: 'Gemeinderats-TV' });
+
+        // Slider 2: Der Direkte Draht — real Klagenfurt v1 content
+        const klgDirekteDraht = KLG_CHANNELS['klg-direkte-draht-ch'];
+        const klgDirekteDrahtVideos = [
+          KLG_VIDEOS['klg-sprechstunde-buergermeister'],
+          KLG_VIDEOS['klg-interview-katzenberger'],
+          KLG_VIDEOS['klg-interview-seboe'],
+          KLG_VIDEOS['klg-interview-trattler'],
+          KLG_VIDEOS['klg-interview-jandl'],
+        ];
+        renderSlider(klgDirekteDraht, klgDirekteDrahtVideos, { label: 'Der Direkte Draht' });
+
+        // Slider 3: Bürgerservice — real Klagenfurt v1 content
+        const klgBuergerservice = KLG_CHANNELS['klg-buergerservice-ch'];
+        const klgBuergerserviceVideos = [
+          KLG_VIDEOS['klg-buergerservice'],
+          KLG_VIDEOS['klg-reportage-fundamt'],
+          KLG_VIDEOS['klg-messerattacke-expertentalk'],
+          KLG_VIDEOS['klg-impfbus-klagenfurt'],
+          KLG_VIDEOS['klg-klagenfurt-waehlt-sicher'],
+        ];
+        renderSlider(klgBuergerservice, klgBuergerserviceVideos, { label: 'Bürgerservice' });
+
+        // Slider 5: Seniorenbüro 50+ — 7 videos, 5 visible, arrows scroll to remaining 2
+        renderSlider(KLG_CHANNELS['klg-seniorenbuero-ch'], [
+          KLG_VIDEOS['klg-fit-aktiv-folge10'],
+          KLG_VIDEOS['klg-fit-aktiv-folge9'],
+          KLG_VIDEOS['klg-fit-aktiv-alter-folge8'],
+          KLG_VIDEOS['klg-fit-aktiv-folge7'],
+          KLG_VIDEOS['klg-fit-aktiv-folge6'],
+          KLG_VIDEOS['klg-fit-aktiv-folge5'],
+          KLG_VIDEOS['klg-fit-aktiv-folge4'],
+        ], { label: 'Seniorenbüro 50+' });
+
+        // Slider 6: Social Media (portrait format, prod-internal)
+        if (sliderOrder[1]?.ch && sliderOrder[1]?.media?.length)
+          renderSlider(sliderOrder[1].ch, sliderOrder[1].media, sliderOrder[1].opts);
+
+        // Fade out loader
+        const loader = document.getElementById('page-loader');
+        loader.classList.add('hidden');
+        setTimeout(() => loader.remove(), 600);
+
+      } catch (err) {
+        console.error('Init error:', err);
+        document.getElementById('page-loader').innerHTML =
+          `<p style="color:#e05050;font-size:14px;text-align:center;padding:20px">
+            Fehler beim Laden.<br>Bitte Seite neu laden.
+          </p>`;
+      }
+    }
+
+    init();
+
+    // Update category arrow state on resize
+    window.addEventListener('resize', updateCatArrows);
+
+    // Fallback: replace any thumbnails that are still pending after 12 s
+    setTimeout(() => {
+      const fb = fallbackThumb();
+      document.querySelectorAll('img').forEach(img => {
+        if (!img.complete || img.naturalWidth === 0) {
+          img.src = fb;
+        }
+      });
+    }, 12000);
+  </script>
+
+</body>
+</html>
