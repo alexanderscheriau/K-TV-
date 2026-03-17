@@ -1050,8 +1050,6 @@
     /* ════════════════════════════════════════
        CONSTANTS & STATE
     ════════════════════════════════════════ */
-    const API    = 'https://api.streamdiver.com/v2';
-    const TENANT = 'prod-internal';
 
     /* ── Klagenfurt real content (v1 library) ────────────────────── */
     const KLG_VIDEOS = {
@@ -1292,44 +1290,14 @@
       'Einrichtungen', 'Seniorenbüro 50+', 'Covid-19'
     ];
 
-    let token         = null;
-    let allChannels   = [];
+    // allChannels is derived directly from local KLG data — no API needed
+    const allChannels = Object.values(KLG_CHANNELS);
+
     let heroVideos    = [];
     let activeHero    = 0;
     let activeCat     = null;
     let sliderPos     = {};   // channelId → current offset index
     let sliderVisible = {};   // channelId → visible card count
-
-    /* ════════════════════════════════════════
-       API HELPERS
-    ════════════════════════════════════════ */
-    async function getToken() {
-      const r = await fetch(`${API}/tokens/public`, {
-        method: 'POST',
-        headers: { 'X-SD-Tenant-Shortcode': TENANT, 'X-SD-Features': 'widgets' }
-      });
-      const d = await r.json();
-      return d.data.accessToken;
-    }
-
-    async function fetchChannels() {
-      const r = await fetch(`${API}/channels?pageSize=30`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const d = await r.json();
-      return d.data || [];
-    }
-
-    async function fetchMedia(channelId, size = 8) {
-      const p = new URLSearchParams({ pageSize: String(size) });
-      if (channelId) p.set('channelIds', channelId);
-      const r = await fetch(`${API}/media?${p}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const d = await r.json();
-      // Filter for video/audio only (exclude images)
-      return (d.data || []).filter(m => m.type !== 'image' && !m.file?.mimeType?.includes('image'));
-    }
 
     /* ════════════════════════════════════════
        FORMATTING
@@ -1356,7 +1324,7 @@
     /* ════════════════════════════════════════
        HERO
     ════════════════════════════════════════ */
-    function renderHero(videos) {
+    function renderHero() {
       // All 4 Hero slots = real Klagenfurt v1 content
       heroVideos = [
         KLG_VIDEOS['klg-37-gemeinderatssitzung'],
@@ -1471,19 +1439,21 @@
         ? 'Alle Kanäle'
         : 'Kanäle: ' + cat;
 
-      const show = allChannels.filter(c => c.mediaCount > 0).slice(0, 8);
-      grid.innerHTML = show.map(ch => `
-        <div class="ch-card" onclick="showChannel('${ch.id}','${esc(ch.name)}',${ch.mediaCount})">
-          <div class="ch-card-thumb">
-            <img src="${ch.thumbnail?.url || fallbackThumb()}" alt="${esc(ch.name)}" loading="eager"
-                 onerror="this.src='${fallbackThumb()}'">
-          </div>
-          <div class="ch-card-body">
-            <div class="ch-card-name">${ch.name}</div>
-            <div class="ch-card-count">${ch.mediaCount} Videos</div>
-          </div>
-        </div>
-      `).join('');
+      const show = allChannels;
+      grid.innerHTML = show.map(ch => {
+        const videoCount = (KLG_VIDEO_CHANNELS[ch.id] || []).length;
+        return `
+          <div class="ch-card" onclick="showChannel('${ch.id}','${esc(ch.name)}',${videoCount})">
+            <div class="ch-card-thumb">
+              <img src="${fallbackThumb()}" alt="${esc(ch.name)}" loading="eager"
+                   onerror="this.src='${fallbackThumb()}'">
+            </div>
+            <div class="ch-card-body">
+              <div class="ch-card-name">${ch.name}</div>
+              <div class="ch-card-count">${videoCount} Videos</div>
+            </div>
+          </div>`;
+      }).join('');
 
       panel.classList.add('open');
     }
@@ -1726,102 +1696,47 @@
     /* ════════════════════════════════════════
        INIT
     ════════════════════════════════════════ */
-    async function init() {
-      try {
-        token = await getToken();
+    function init() {
+      renderHero();
+      renderCategories();
 
-        // Parallel load: channels + hero media
-        const [channels, heroMedia] = await Promise.all([
-          fetchChannels(),
-          fetchMedia(null, 12)
-        ]);
+      renderSlider(KLG_CHANNELS['klg-gemeinderats-tv'], [
+        KLG_VIDEOS['klg-37-gemeinderatssitzung'],
+        KLG_VIDEOS['klg-36-gemeinderatssitzung'],
+        KLG_VIDEOS['klg-35-gemeinderatssitzung'],
+        KLG_VIDEOS['klg-34-gemeinderatssitzung'],
+        KLG_VIDEOS['klg-33-gemeinderatssitzung'],
+      ], { label: 'Gemeinderats-TV' });
 
-        // Store all channels for category expansion
-        allChannels = channels.filter(c => c.mediaCount > 0);
+      renderSlider(KLG_CHANNELS['klg-direkte-draht-ch'], [
+        KLG_VIDEOS['klg-sprechstunde-buergermeister'],
+        KLG_VIDEOS['klg-interview-katzenberger'],
+        KLG_VIDEOS['klg-interview-seboe'],
+        KLG_VIDEOS['klg-interview-trattler'],
+        KLG_VIDEOS['klg-interview-jandl'],
+      ], { label: 'Der Direkte Draht' });
 
-        // Filter video channels for sliders (exclude image-only collections)
-        const videoChannels = allChannels
-          .filter(c => !c.name.toLowerCase().includes('image'))
-          .sort((a, b) => b.mediaCount - a.mediaCount)
-          .slice(0, 4);
+      renderSlider(KLG_CHANNELS['klg-buergerservice-ch'], [
+        KLG_VIDEOS['klg-buergerservice'],
+        KLG_VIDEOS['klg-reportage-fundamt'],
+        KLG_VIDEOS['klg-messerattacke-expertentalk'],
+        KLG_VIDEOS['klg-impfbus-klagenfurt'],
+        KLG_VIDEOS['klg-klagenfurt-waehlt-sicher'],
+      ], { label: 'Bürgerservice' });
 
-        // Load slider videos in parallel
-        const sliderMedia = await Promise.all(
-          videoChannels.map(ch => fetchMedia(ch.id, 10))
-        );
+      renderSlider(KLG_CHANNELS['klg-seniorenbuero-ch'], [
+        KLG_VIDEOS['klg-fit-aktiv-folge10'],
+        KLG_VIDEOS['klg-fit-aktiv-folge9'],
+        KLG_VIDEOS['klg-fit-aktiv-alter-folge8'],
+        KLG_VIDEOS['klg-fit-aktiv-folge7'],
+        KLG_VIDEOS['klg-fit-aktiv-folge6'],
+        KLG_VIDEOS['klg-fit-aktiv-folge5'],
+        KLG_VIDEOS['klg-fit-aktiv-folge4'],
+      ], { label: 'Seniorenbüro 50+' });
 
-        // Arrange: [0] normal · [3] social media (portrait) · [1] normal · [2] normal
-        const sliderOrder = [
-          { ch: videoChannels[0], media: sliderMedia[0], opts: {} },
-          { ch: videoChannels[3], media: sliderMedia[3], opts: { portrait: true, label: 'Social Media' } },
-          { ch: videoChannels[1], media: sliderMedia[1], opts: {} },
-          { ch: videoChannels[2], media: sliderMedia[2], opts: {} },
-        ];
-
-        // Render everything
-        renderHero(heroMedia);
-        renderCategories();
-
-        // Slider 1: Gemeinderats-TV — real Klagenfurt v1 content
-        const klgGemeinderat = KLG_CHANNELS['klg-gemeinderats-tv'];
-        const klgGemeinderatVideos = [
-          KLG_VIDEOS['klg-37-gemeinderatssitzung'],
-          KLG_VIDEOS['klg-36-gemeinderatssitzung'],
-          KLG_VIDEOS['klg-35-gemeinderatssitzung'],
-          KLG_VIDEOS['klg-34-gemeinderatssitzung'],
-          KLG_VIDEOS['klg-33-gemeinderatssitzung'],
-        ];
-        renderSlider(klgGemeinderat, klgGemeinderatVideos, { label: 'Gemeinderats-TV' });
-
-        // Slider 2: Der Direkte Draht — real Klagenfurt v1 content
-        const klgDirekteDraht = KLG_CHANNELS['klg-direkte-draht-ch'];
-        const klgDirekteDrahtVideos = [
-          KLG_VIDEOS['klg-sprechstunde-buergermeister'],
-          KLG_VIDEOS['klg-interview-katzenberger'],
-          KLG_VIDEOS['klg-interview-seboe'],
-          KLG_VIDEOS['klg-interview-trattler'],
-          KLG_VIDEOS['klg-interview-jandl'],
-        ];
-        renderSlider(klgDirekteDraht, klgDirekteDrahtVideos, { label: 'Der Direkte Draht' });
-
-        // Slider 3: Bürgerservice — real Klagenfurt v1 content
-        const klgBuergerservice = KLG_CHANNELS['klg-buergerservice-ch'];
-        const klgBuergerserviceVideos = [
-          KLG_VIDEOS['klg-buergerservice'],
-          KLG_VIDEOS['klg-reportage-fundamt'],
-          KLG_VIDEOS['klg-messerattacke-expertentalk'],
-          KLG_VIDEOS['klg-impfbus-klagenfurt'],
-          KLG_VIDEOS['klg-klagenfurt-waehlt-sicher'],
-        ];
-        renderSlider(klgBuergerservice, klgBuergerserviceVideos, { label: 'Bürgerservice' });
-
-        // Slider 5: Seniorenbüro 50+ — 7 videos, 5 visible, arrows scroll to remaining 2
-        renderSlider(KLG_CHANNELS['klg-seniorenbuero-ch'], [
-          KLG_VIDEOS['klg-fit-aktiv-folge10'],
-          KLG_VIDEOS['klg-fit-aktiv-folge9'],
-          KLG_VIDEOS['klg-fit-aktiv-alter-folge8'],
-          KLG_VIDEOS['klg-fit-aktiv-folge7'],
-          KLG_VIDEOS['klg-fit-aktiv-folge6'],
-          KLG_VIDEOS['klg-fit-aktiv-folge5'],
-          KLG_VIDEOS['klg-fit-aktiv-folge4'],
-        ], { label: 'Seniorenbüro 50+' });
-
-        // Slider 6: Social Media (portrait format, prod-internal)
-        if (sliderOrder[1]?.ch && sliderOrder[1]?.media?.length)
-          renderSlider(sliderOrder[1].ch, sliderOrder[1].media, sliderOrder[1].opts);
-
-        // Fade out loader
-        const loader = document.getElementById('page-loader');
-        loader.classList.add('hidden');
-        setTimeout(() => loader.remove(), 600);
-
-      } catch (err) {
-        console.error('Init error:', err);
-        document.getElementById('page-loader').innerHTML =
-          `<p style="color:#e05050;font-size:14px;text-align:center;padding:20px">
-            Fehler beim Laden.<br>Bitte Seite neu laden.
-          </p>`;
-      }
+      const loader = document.getElementById('page-loader');
+      loader.classList.add('hidden');
+      setTimeout(() => loader.remove(), 600);
     }
 
     init();
